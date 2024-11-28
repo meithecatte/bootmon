@@ -33,6 +33,6 @@ readline:
 .not_backspace:
     jmp .loop
 
-    times 446 - ($ - $$) db 0x69
+    times 446 - ($ - $$) db 0
     times 64 db 0
     db 0x55, 0xaa
