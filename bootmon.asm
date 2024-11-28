@@ -4,6 +4,15 @@ bits 16
 cmdbuf equ 0x500
 
     jmp 0:start
+start:
+    mov ax, 0x7000
+    mov ss, ax
+    xor sp, sp
+    mov ds, sp
+    mov es, sp
+
+    mov [int13+1], dl
+    jmp short restart
 
 cmd_peek:
     mov si, 0
@@ -34,13 +43,11 @@ cmd_poke:
     mov [cmd_poke+1], di
     jmp short .loop
 
-start:
-    mov ax, 0x7000
-    mov ss, ax
-    xor sp, sp
-    mov ds, sp
-    mov es, sp
-
+cmd_go:
+    mov di, 0
+    call di
+    ; fallthrough
+restart:
     xor bx, bx
     mov ax, 0x0e0d
     int 0x10
@@ -56,7 +63,7 @@ readline:
     int 0x16
     stosb
     cmp al, 0x1b
-    jz start
+    jz restart
     mov ah, 0x0e
     xor bx, bx
     int 0x10
@@ -120,7 +127,6 @@ putnibble:
 parsebyte: ; assumes first character is in AL
     xor bx, bx
     call convnibble
-parsenibble:
     lodsb
 convnibble:
     cmp al, 0x39
@@ -132,11 +138,17 @@ convnibble:
     or bl, al
     ret
 
+int13:
+    mov dl, 0
+    int 0x13
+
 cmdtable:
     db ":"
     dw cmd_poke
     db 0
     dw cmd_peek
+    db "g"
+    dw cmd_go
     db 0x80
 
     times 446 - ($ - $$) db 0
