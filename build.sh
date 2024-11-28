@@ -1,4 +1,5 @@
 #!/bin/sh
+set -e
 nasm -f bin bootmon.asm -o bootmon.bin
 bytecount=$(xxd -ps bootmon.bin |
     tr -d '\n' |
