@@ -4,6 +4,36 @@ bits 16
 cmdbuf equ 0x500
 
     jmp 0:start
+
+cmd_peek:
+    mov si, 0
+    mov dx, si
+    call putword
+    mov cx, 16
+.loop:
+    mov al, " "
+    int 0x10
+    lodsb
+    mov dh, al
+    call putbyte
+    loop .loop
+    mov [cmd_peek+1], si
+    jmp short readline
+
+cmd_poke:
+    mov di, 0
+.loop:
+    lodsb
+    or al, al
+    jz short readline
+    cmp al, " "
+    jbe short .loop
+    call parsebyte
+    xchg ax, bx ; mov ax, bx
+    stosb
+    mov [cmd_poke+1], di
+    jmp short .loop
+
 start:
     mov ax, 0x7000
     mov ss, ax
@@ -31,18 +61,18 @@ readline:
     xor bx, bx
     int 0x10
     cmp al, 0x0d
-    jz .end
+    jz short .end
     cmp al, 0x08
-    jnz .loop
+    jnz short .loop
     mov al, " "
     int 0x10
     mov al, 0x08
     int 0x10
     dec di
     cmp di, cmdbuf
-    je .loop
+    je short .loop
     dec di
-    jmp .loop
+    jmp short .loop
 .end:
     mov al, 0x0a
     int 0x10
@@ -55,42 +85,19 @@ parsecmd:
 .find:
     scasw
     scasb
-    je foundcmd
-    jno .find
-    
-parsehexdigit:
-    cmp al, 0x39
-    jbe .ok
-    add al, 9
-.ok:
-    and al, 0x0f
-    shl bx, 4
-    or bl, al
-    jmp parsecmd
+    je short foundcmd
+    jno short .find
+
+    call convnibble
+    jmp short parsecmd
 
 foundcmd:
     mov di, [di]
     cmp si, cmdbuf + 1
-    je .noaddr
+    je short .noaddr
     mov [di+1], bx
 .noaddr:
     jmp di
-
-cmd_poke:
-cmd_peek:
-    mov si, 0
-    mov dx, si
-    call putword
-    mov cx, 16
-.loop:
-    mov al, " "
-    int 0x10
-    lodsb
-    mov dh, al
-    call putbyte
-    loop .loop
-    mov [cmd_peek+1], si
-    jmp readline
 
 putword: ; DX
     call putbyte
@@ -108,6 +115,21 @@ putnibble:
     mov ah, 0x0e
     xor bx, bx
     int 0x10
+    ret
+
+parsebyte: ; assumes first character is in AL
+    xor bx, bx
+    call convnibble
+parsenibble:
+    lodsb
+convnibble:
+    cmp al, 0x39
+    jbe short .ok
+    add al, 9
+.ok:
+    and al, 0x0f
+    shl bx, 4
+    or bl, al
     ret
 
 cmdtable:
