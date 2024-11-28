@@ -115,7 +115,7 @@ cmdtable:
     dw cmd_poke
     db 0
     dw cmd_peek
-    db 0xff
+    db 0x80
 
     times 446 - ($ - $$) db 0
     times 64 db 0
