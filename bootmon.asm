@@ -67,11 +67,16 @@ cmd_peek: mov si, 0
 cmd_poke: mov di, 0
 .loop:
     lodsb
-    or al, al ; cmp al, 0
+    or al, al
     jz short readline
     cmp al, " "
     jbe short .loop
-    call parsebyte
+    xor bx, bx
+    call convnibble
+    lodsb
+    or al, al
+    jz short readline
+    call convnibble
     xchg ax, bx ; mov ax, bx
     stosb
     mov [cmd_poke+1], di
@@ -157,10 +162,6 @@ putnibble:
     int 0x10
     ret
 
-parsebyte: ; assumes first character is in AL
-    xor bx, bx
-    call convnibble
-    lodsb
 convnibble:
     cmp al, 0x39
     jbe short .ok
