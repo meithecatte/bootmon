@@ -33,7 +33,7 @@ cmd_poke:
     mov di, 0
 .loop:
     lodsb
-    or al, al
+    or al, al ; cmp al, 0
     jz short readline
     cmp al, " "
     jbe short .loop
@@ -138,9 +138,39 @@ convnibble:
     or bl, al
     ret
 
+cmd_diskwrite:
+    mov di, 0
+    mov ah, 0x43 ; LBA write
+    jmp int13
+
+cmd_diskread:
+    mov di, 0
+    mov ah, 0x42 ; LBA read
+    ; fallthrough
 int13:
     mov dl, 0
+    mov [lbaaddr], word di
+    mov di, lbabuf
+
+    .loop:
+    lodsb
+    or al, al
+    jz .cont
+    call parsebyte
+    xchg ax, bx
+    stosb
+    jmp near .loop
+
+    .cont:
+    mov si, lbatable
+    mov al, 0 ; flags (for LBA write)
     int 0x13
+    jnc readline
+
+err:
+    mov dh, ah
+    call putbyte
+    jmp readline
 
 cmdtable:
     db ":"
@@ -149,7 +179,22 @@ cmdtable:
     dw cmd_peek
     db "g"
     dw cmd_go
+    db "R"
+    dw cmd_diskread
+    db "W"
+    dw cmd_diskwrite
     db 0x80
+
+lbatable:
+    db 0x10   ; packet size
+    db 0      ; nothing
+    lbasectors:
+    dw 0x0001 ; number of sectors
+    lbabuf:
+    dd 0x2000 ; x-fer buffer
+    lbaaddr:
+    dw 0x0000 ; addr
+    dw 0x0000 ; addr
 
     times 446 - ($ - $$) db 0
     times 64 db 0
