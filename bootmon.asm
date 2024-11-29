@@ -14,8 +14,43 @@ start:
     mov [int13+1], dl
     jmp short restart
 
-cmd_peek:
-    mov si, 0
+; Coding convention: all instructions whose immediates are being modified
+; are on the same line as the label, to signify that no instructions can
+; be inserted before them.
+cmd_diskwrite: mov ax, 0
+    mov cx, 0x4300 ; LBA write
+    jmp short diskop
+
+cmd_diskread: mov ax, 0
+    mov ch, 0x42 ; LBA read
+diskop:
+    ; fallthrough
+    mov di, diskpacket.buf
+    stosw
+    scasw
+
+    xor bx, bx
+.loop:
+    lodsb
+    or al, al
+    jz short .cont
+    call convnibble
+    jmp short .loop
+
+.cont:
+    mov [di], bx
+    mov si, diskpacket
+    xchg ax, cx
+int13: mov dl, 0
+    int 0x13
+    jnc short readline
+
+.err:
+    xchg dx, ax ; mov dh, ah
+    call putbyte
+    jmp short restart
+
+cmd_peek: mov si, 0
     mov dx, si
     call putword
     mov cx, 16
@@ -29,8 +64,7 @@ cmd_peek:
     mov [cmd_peek+1], si
     jmp short readline
 
-cmd_poke:
-    mov di, 0
+cmd_poke: mov di, 0
 .loop:
     lodsb
     or al, al ; cmp al, 0
@@ -43,8 +77,7 @@ cmd_poke:
     mov [cmd_poke+1], di
     jmp short .loop
 
-cmd_go:
-    mov di, 0
+cmd_go: mov di, 0
     call di
     ; fallthrough
 restart:
@@ -138,40 +171,6 @@ convnibble:
     or bl, al
     ret
 
-cmd_diskwrite:
-    mov di, 0
-    mov ah, 0x43 ; LBA write
-    jmp int13
-
-cmd_diskread:
-    mov di, 0
-    mov ah, 0x42 ; LBA read
-    ; fallthrough
-int13:
-    mov dl, 0
-    mov [lbaaddr], word di
-    mov di, lbabuf
-
-    .loop:
-    lodsb
-    or al, al
-    jz .cont
-    call parsebyte
-    xchg ax, bx
-    stosb
-    jmp near .loop
-
-    .cont:
-    mov si, lbatable
-    mov al, 0 ; flags (for LBA write)
-    int 0x13
-    jnc readline
-
-err:
-    mov dh, ah
-    call putbyte
-    jmp readline
-
 cmdtable:
     db ":"
     dw cmd_poke
@@ -185,17 +184,16 @@ cmdtable:
     dw cmd_diskwrite
     db 0x80
 
-lbatable:
+diskpacket:
     db 0x10   ; packet size
     db 0      ; nothing
-    lbasectors:
+.count:
     dw 0x0001 ; number of sectors
-    lbabuf:
+.buf:
     dd 0x2000 ; x-fer buffer
-    lbaaddr:
-    dw 0x0000 ; addr
-    dw 0x0000 ; addr
+.lba:
+    dq 0      ; LBA
 
-    times 446 - ($ - $$) db 0
+    times 446 - ($ - $$) db 0x69
     times 64 db 0
     db 0x55, 0xaa
