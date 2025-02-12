@@ -99,22 +99,22 @@ readline:
 .loop:
     mov ah, 0
     int 0x16
-    stosb
-    cmp al, 0x1b
+    stosb           ; append to buffer
+    cmp al, 0x1b    ; ESC? discard line
     jz restart
-    mov ah, 0x0e
+    mov ah, 0x0e    ; otherwise, print the character
     xor bx, bx
     int 0x10
-    cmp al, 0x0d
+    cmp al, 0x0d    ; CR? we're done
     jz short .end
-    cmp al, 0x08
+    cmp al, 0x08    ; backspace?
     jnz short .loop
-    mov al, " "
-    int 0x10
+    mov al, " "     ; we printed the backspace already, but let's
+    int 0x10        ; actually erase the character
     mov al, 0x08
     int 0x10
     dec di
-    cmp di, cmdbuf
+    cmp di, cmdbuf  ; don't underflow the buffer
     je short .loop
     dec di
     jmp short .loop
@@ -128,12 +128,12 @@ parsecmd:
     mov di, cmdtable - 2
     lodsb
 .find:
-    scasw
-    scasb
+    scasw               ; skip address of previous entry
+    scasb               ; cmp al, [di]
     je short foundcmd
-    jno short .find
-
-    call convnibble
+    jno short .find     ; command list terminator of 0x80
+                        ; is guaranteed to overflow
+    call convnibble     ; not a command? must be a hex character
     jmp short parsecmd
 
 foundcmd:
