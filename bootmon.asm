@@ -5,11 +5,19 @@ cmdbuf equ 0x500
 
     jmp 0:start
 start:
-    mov ax, 0x7000
-    mov ss, ax
     xor sp, sp
+    mov ss, sp
     mov ds, sp
     mov es, sp
+
+    mov di, 12      ; breakpoint vector
+    mov ax, int3
+    stosw
+    mov [di], sp    ; handy zeroed-out register
+
+    mov di, 4       ; singlestep vector
+    stosw
+    mov [di], sp
 
     mov [int13+1], dl
     jmp short restart
@@ -50,10 +58,17 @@ int13: mov dl, 0
     call putbyte
     jmp short restart
 
+int3:
+    pusha
+    mov si, sp
+    mov cx, 22
+    jmp short hexdump
+
 cmd_peek: mov si, 0
+    mov cx, 16
+hexdump:
     mov dx, si
     call putword
-    mov cx, 16
 .loop:
     mov al, " "
     int 0x10
@@ -172,6 +187,18 @@ convnibble:
     or bl, al
     ret
 
+cmd_step:
+    mov bx, sp
+    or byte [bx+0x15], 1 ; set TF in FLAGS
+    popa
+    iret
+
+cmd_continue:
+    mov bx, sp
+    and byte [bx+0x15], 0xfe ; reset TF in FLAGS
+    popa
+    iret
+
 cmdtable:
     db ":"
     dw cmd_poke
@@ -183,6 +210,10 @@ cmdtable:
     dw cmd_diskread
     db "W"
     dw cmd_diskwrite
+    db "k"
+    dw cmd_continue
+    db "s"
+    dw cmd_step
     db 0x80
 
 diskpacket:
